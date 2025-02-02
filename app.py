@@ -1,205 +1,13 @@
-import base64
-import os
-import re
-import requests
 import streamlit as st
-import streamlit.components.v1 as components
-from collections import defaultdict
-from github import Github
-from dotenv import load_dotenv
-from threat_model import (
-    create_threat_model_prompt,
-    get_threat_model,
-    get_threat_model_azure,
-    get_threat_model_google,
-    get_threat_model_mistral,
-    get_threat_model_ollama,
-    get_threat_model_anthropic
-)
-from attack_tree import (
-    create_attack_tree_prompt,
-    get_attack_tree,
-    get_attack_tree_azure,
-    get_attack_tree_mistral,
-    get_attack_tree_ollama,
-    get_attack_tree_anthropic
-)
-from mitigations import (
-    create_mitigations_prompt,
-    get_mitigations,
-    get_mitigations_azure,
-    get_mitigations_google,
-    get_mitigations_mistral,
-    get_mitigations_ollama,
-    get_mitigations_anthropic
-)
-from test_cases import (
-    create_test_cases_prompt,
-    get_test_cases,
-    get_test_cases_azure,
-    get_test_cases_google,
-    get_test_cases_mistral,
-    get_test_cases_ollama,
-    get_test_cases_anthropic
-)
-from dread import (
-    create_dread_assessment_prompt,
-    get_dread_assessment,
-    get_dread_assessment_azure,
-    get_dread_assessment_google,
-    get_dread_assessment_mistral,
-    get_dread_assessment_ollama,
-    get_dread_assessment_anthropic
-)
+from utils.input import get_input
+from utils.repo_analysis import analyze_github_repo
+from utils.load_env import load_env_variables
+from utils.mermaid import mermaid
 
-
-def get_input():
-    github_url = st.text_input(
-        label="Enter GitHub repository URL (optional)",
-        placeholder="https://github.com/owner/repo",
-        key="github_url",
-        help="Enter the URL of the GitHub repository you want to analyze.",
-    )
-
-    if github_url and github_url != st.session_state.get('last_analyzed_url', ''):
-        if 'github_api_key' not in st.session_state or not st.session_state['github_api_key']:
-            st.warning("Please enter a GitHub API key to analyze the repository.")
-        else:
-            with st.spinner('Analyzing GitHub repository...'):
-                system_description = analyze_github_repo(github_url)
-                st.session_state['github_analysis'] = system_description
-                st.session_state['last_analyzed_url'] = github_url
-                st.session_state['app_input'] = system_description + "\n\n" + st.session_state.get('app_input', '')
-
-    input_text = st.text_area(
-        label="Describe the application to be modelled",
-        value=st.session_state.get('app_input', ''),
-        placeholder="Enter your application details...",
-        height=300,
-        key="app_desc",
-        help="Please provide a detailed description of the application, including the purpose of the application, the technologies used, and any other relevant information.",
-    )
-
-    st.session_state['app_input'] = input_text
-
-    return input_text
-
-
-def analyze_github_repo(repo_url):
-    parts = repo_url.split('/')
-    owner = parts[-2]
-    repo_name = parts[-1]
-
-    g = Github(st.session_state.get('github_api_key', ''))
-    repo = g.get_repo(f"{owner}/{repo_name}")
-    default_branch = repo.default_branch
-    tree = repo.get_git_tree(default_branch, recursive=True)
-
-    file_summaries = defaultdict(list)
-    total_chars = 0
-    char_limit = 100000
-    readme_content = ""
-
-    for file in tree.tree:
-        if file.path.lower() == 'readme.md':
-            content = repo.get_contents(file.path, ref=default_branch)
-            readme_content = base64.b64decode(content.content).decode()
-        elif file.type == "blob" and file.path.endswith(('.py', '.js', '.ts', '.html', '.css', '.java', '.go', '.rb')):
-            content = repo.get_contents(file.path, ref=default_branch)
-            decoded_content = base64.b64decode(content.content).decode()
-            summary = summarize_file(file.path, decoded_content)
-            file_summaries[file.path.split('.')[-1]].append(summary)
-            total_chars += len(summary)
-            if total_chars > char_limit:
-                break
-
-    system_description = f"Repository: {repo_url}\n\n"
-    if readme_content:
-        system_description += "README.md Content:\n"
-        if len(readme_content) > 5000:
-            system_description += readme_content[:5000] + "...\n(README truncated due to length)\n\n"
-        else:
-            system_description += readme_content + "\n\n"
-
-    for file_type, summaries in file_summaries.items():
-        system_description += f"{file_type.upper()} Files:\n"
-        for summary in summaries:
-            system_description += summary + "\n"
-        system_description += "\n"
-
-    return system_description
-
-
-def summarize_file(file_path, content):
-    imports = re.findall(r'^import .*|^from .* import .*', content, re.MULTILINE)
-    functions = re.findall(r'def .*\\(.*\\):', content)
-    classes = re.findall(r'class .*:', content)
-
-    summary = f"File: {file_path}\n"
-    if imports:
-        summary += "Imports:\n" + "\n".join(imports[:5]) + "\n"
-    if functions:
-        summary += "Functions:\n" + "\n".join(functions[:5]) + "\n"
-    if classes:
-        summary += "Classes:\n" + "\n".join(classes[:5]) + "\n"
-
-    return summary
-
-
-def mermaid(code: str, height: int = 500) -> None:
-    components.html(
-        f"""
-        <pre class="mermaid" style="height: {height}px;">
-            {code}
-        </pre>
-        <script type="module">
-            import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-            mermaid.initialize({{ startOnLoad: true }});
-        </script>
-        """,
-        height=height,
-    )
-
-
-def load_env_variables():
-    if os.path.exists('.env'):
-        load_dotenv('.env')
-
-    github_api_key = os.getenv('GITHUB_API_KEY')
-    if github_api_key:
-        st.session_state['github_api_key'] = github_api_key
-
-    openai_api_key = os.getenv('OPENAI_API_KEY')
-    if openai_api_key:
-        st.session_state['openai_api_key'] = openai_api_key
-
-    anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
-    if anthropic_api_key:
-        st.session_state['anthropic_api_key'] = anthropic_api_key
-
-    azure_api_key = os.getenv('AZURE_API_KEY')
-    if azure_api_key:
-        st.session_state['azure_api_key'] = azure_api_key
-
-    azure_api_endpoint = os.getenv('AZURE_API_ENDPOINT')
-    if azure_api_endpoint:
-        st.session_state['azure_api_endpoint'] = azure_api_endpoint
-
-    azure_deployment_name = os.getenv('AZURE_DEPLOYMENT_NAME')
-    if azure_deployment_name:
-        st.session_state['azure_deployment_name'] = azure_deployment_name
-
-    google_api_key = os.getenv('GOOGLE_API_KEY')
-    if google_api_key:
-        st.session_state['google_api_key'] = google_api_key
-
-    mistral_api_key = os.getenv('MISTRAL_API_KEY')
-    if mistral_api_key:
-        st.session_state['mistral_api_key'] = mistral_api_key
-
-
+# Load environment variables
 load_env_variables()
 
+# Streamlit page configuration
 st.set_page_config(
     page_title="STRIDE GPT",
     page_icon=":shield:",
@@ -207,8 +15,8 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Sidebar configuration
 st.sidebar.image("logo.png")
-
 st.sidebar.header("How to use STRIDE GPT")
 
 with st.sidebar:
@@ -455,6 +263,6 @@ with tab1:
     st.markdown("---")
     col1, col2 = st.columns([1, 1])
 
-if 'app_input' not in data:
+if 'app_input' not in st.session_state:
     # Add your code here
     print("app_input not found in data")
