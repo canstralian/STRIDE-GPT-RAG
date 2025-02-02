@@ -455,4 +455,6 @@ with tab1:
     st.markdown("---")
     col1, col2 = st.columns([1, 1])
 
-    if 'app_input' not
+if 'app_input' not in data:
+    # Add your code here
+    print("app_input not found in data")
