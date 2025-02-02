@@ -31,5 +31,5 @@ jobs:
     - name: Deploy to Huggingface
       run: |
         huggingface-cli repo create my-streamlit-app --type=space --private
-        huggingface-cli repo upload --repo-id <username>/my-streamlit-app app.py requirements.txt
-        huggingface-cli space hardware --repo-id <username>/my-streamlit-app --hardware cpu-basic
+        huggingface-cli repo upload --repo-id Canstralian/my-streamlit-app app.py requirements.txt
+        huggingface-cli space hardware --repo-id Canstralian/my-streamlit-app --hardware cpu-basic
