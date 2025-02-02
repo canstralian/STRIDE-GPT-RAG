@@ -1,80 +1,53 @@
-import streamlit as st
-import google.generativeai as palm
-import anthropic
 import os
+import google.generativeai as genai
+from transformers import pipeline
 
-# Initialize APIs
-palm_api_key = os.getenv('GOOGLE_PALM_API_KEY')
-anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
+# Load API keys from environment variables
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Function to validate API keys
-def validate_api_keys():
-    if not palm_api_key:
-        st.error("Google PaLM API key is missing. Please set the 'GOOGLE_PALM_API_KEY' environment variable.")
-        return False
-    if not anthropic_api_key:
-        st.error("Anthropic API key is missing. Please set the 'ANTHROPIC_API_KEY' environment variable.")
-        return False
-    return True
+# Debugging: Ensure API keys are loaded (REMOVE in production)
+print(f"GOOGLE_API_KEY Loaded: {bool(GOOGLE_API_KEY)}")
+print(f"HF_TOKEN Loaded: {bool(HF_TOKEN)}")
 
-# Function to generate response using Google PaLM
-def generate_palm_response(prompt):
+# Ensure API keys are set
+if not GOOGLE_API_KEY:
+    raise ValueError("❌ Missing GOOGLE_API_KEY. Set it as an environment variable.")
+
+if not HF_TOKEN:
+    raise ValueError("❌ Missing HF_TOKEN. Set it as an environment variable.")
+
+# Configure Google Gemini API
+genai.configure(api_key=GOOGLE_API_KEY)
+
+# Initialize Hugging Face pipeline (example: text generation)
+try:
+    hf_pipe = pipeline("text-generation", model="gpt2", use_auth_token=HF_TOKEN)
+except Exception as e:
+    raise RuntimeError(f"Error initializing Hugging Face pipeline: {e}")
+
+def generate_gemini_response(prompt):
+    """Generate response from Google's Gemini API."""
     try:
-        palm.configure(api_key=palm_api_key)
-        response = palm.generate_text(
-            model='models/text-bison-001',
-            prompt=prompt,
-            temperature=0.7,
-            max_output_tokens=512,
-        )
-        return response.result
+        model = genai.GenerativeModel(model_name="gemini-pro")  # Correct usage
+        response = model.generate_content(prompt)
+        return response.text if response and hasattr(response, "text") else "No response from Gemini."
     except Exception as e:
-        st.error(f"An error occurred while generating response with Google PaLM: {e}")
-        return None
+        return f"Error with Gemini API: {e}"
 
-# Function to generate response using Anthropic Claude
-def generate_claude_response(prompt):
+def generate_hf_response(prompt):
+    """Generate response from Hugging Face model."""
     try:
-        anthropic_client = anthropic.Client(api_key=anthropic_api_key)
-        claude_prompt = f"{anthropic.HUMAN_PROMPT} {prompt}{anthropic.AI_PROMPT}"
-        response = anthropic_client.completions.create(
-            model="claude-1",
-            prompt=claude_prompt,
-            max_tokens_to_sample=512,
-            temperature=0.7,
-        )
-        return response.completion
+        response = hf_pipe(prompt, max_length=100, num_return_sequences=1)
+        return response[0]["generated_text"] if response else "No response from HF."
     except Exception as e:
-        st.error(f"An error occurred while generating response with Anthropic Claude: {e}")
-        return None
+        return f"Error with Hugging Face API: {e}"
 
-# Streamlit Interface
-def main():
-    st.title("STRIDE GPT RAG")
+if __name__ == "__main__":
+    test_prompt = "Tell me a fun fact about space."
+    
+    print("\n🔹 Google Gemini Response:")
+    print(generate_gemini_response(test_prompt))
 
-    if not validate_api_keys():
-        return
-
-    # User input
-    user_input = st.text_area("Enter your threat modeling query:")
-
-    # Model selection
-    model_choice = st.selectbox("Choose the model to generate response:", ("Google PaLM", "Anthropic Claude"))
-
-    if st.button("Generate Response"):
-        if user_input.strip():
-            if model_choice == "Google PaLM":
-                with st.spinner("Generating response with Google PaLM..."):
-                    response = generate_palm_response(user_input)
-            else:
-                with st.spinner("Generating response with Anthropic Claude..."):
-                    response = generate_claude_response(user_input)
-
-            if response:
-                st.subheader("Generated Response:")
-                st.write(response)
-        else:
-            st.warning("Please enter a valid query.")
-
-if __name__ == '__main__':
-    main()
+    print("\n🔹 Hugging Face Response:")
+    print(generate_hf_response(test_prompt))
