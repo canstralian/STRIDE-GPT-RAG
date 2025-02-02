@@ -90,7 +90,7 @@ This project is licensed under the Apache-2.0 License. See the [LICENSE](LICENSE
 
 ## Contact
 
-For questions or support, please contact [your-email@example.com](mailto:your-email@example.com).
+For questions or support, please contact [12lb6o3m7@mozmail.com](mailto:12lb6o3m7@mozmail.com).
 
 ## References
 
