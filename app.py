@@ -1,8 +1,42 @@
 import streamlit as st
+import random
 from utils.input import get_input
 from utils.repo_analysis import analyze_github_repo
 from utils.load_env import load_env_variables
 from utils.mermaid import mermaid
+
+# STRIDE categories
+STRIDE_CATEGORIES = {
+    'Spoofing': 'Impersonating another user or system.',
+    'Tampering': 'Modifying data or code to disrupt or manipulate.',
+    'Repudiation': 'Claiming to have not performed an action that has occurred.',
+    'Information Disclosure': 'Exposing confidential information.',
+    'Denial of Service': 'Disrupting or denying access to services.',
+    'Elevation of Privilege': 'Gaining unauthorized access to resources.'
+}
+
+def rag_model(query):
+    """Simulates a retrieval-augmented generation model."""
+    responses = [
+        "Consider implementing multi-factor authentication.",
+        "Regularly audit your systems for vulnerabilities.",
+        "Use encryption for sensitive data in transit.",
+        "Implement logging and monitoring to detect anomalies.",
+        "Conduct regular security training for employees."
+    ]
+    return random.choice(responses)
+
+def analyze_threats(threat_description):
+    """Analyzes the threat based on the STRIDE framework."""
+    threats = []
+    for category, description in STRIDE_CATEGORIES.items():
+        if category.lower() in threat_description.lower():
+            threats.append((category, description))
+    
+    if not threats:
+        return "No threats identified based on the STRIDE framework."
+    
+    return threats
 
 # Load environment variables
 load_env_variables()
@@ -217,13 +251,13 @@ with st.sidebar:
     st.markdown(
         """
         ### **What is STRIDE?**
-        STRIDE is a threat modeling methodology that helps to identify and categorise potential security risks in software applications. It stands for **S**poofing, **T**ampering, **R**epudiation, **I**nformation disclosure, **D**enial of service, and **E**levation of privilege.
+        STRIDE is a threat modeling methodology that helps to identify and categorise potential security risks in software applications. It stands for **S**poofing, **T**ampering, **R**epudiation, **I**nformation Disclosure, **D**enial of Service, and **E**levation of Privilege.
         """
     )
     st.markdown(
         """
         ### **How does STRIDE GPT work?**
-        When you enter an application description and other relevant details, the tool will use a GPT model to generate a threat model for your application. The model uses the application description to identify potential threats and suggest mitigations.
+        When you enter an application description and other relevant details, the tool will use a GPT model to generate a threat model for your application. The model uses the application description to identify potential threats and provide suggestions for mitigating those threats.
         """
     )
     st.markdown(
@@ -241,7 +275,7 @@ with st.sidebar:
     st.markdown(
         """
         ### **Are the threat models 100% accurate?**
-        No, the threat models are not 100% accurate. STRIDE GPT uses GPT Large Language Models (LLMs) to generate its output. The GPT models are powerful, but they sometimes make mistakes and are prone to hallucination.
+        No, the threat models are not 100% accurate. STRIDE GPT uses GPT Large Language Models (LLMs) to generate its output. The GPT models are powerful, but they sometimes make mistakes and are prone to hallucinations. Always review the generated threat models and use them as a guide.
         """
     )
     st.markdown(
@@ -256,13 +290,28 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["Threat Model", "Attack Tree", "Mitigati
 with tab1:
     st.markdown(
         """
-        A threat model helps identify and evaluate potential security threats to applications / systems. It provides a systematic approach to 
+        A threat model helps identify and evaluate potential security threats to applications/systems. It provides a systematic approach to 
         understanding possible vulnerabilities and attack vectors. Use this tab to generate a threat model using the STRIDE methodology.
         """
     )
     st.markdown("---")
     col1, col2 = st.columns([1, 1])
 
+    threat_description = st.text_input("Please describe the potential threat:")
+
+    if st.button("Analyze Threat"):
+        identified_threats = analyze_threats(threat_description)
+        
+        if isinstance(identified_threats, str):
+            st.write(identified_threats)
+        else:
+            st.write("Identified Threats:")
+            for category, description in identified_threats:
+                st.write(f"{category}: {description}")
+            
+            # Generate RAG response
+            rag_response = rag_model(threat_description)
+            st.write(f"\nRAG Suggestion: {rag_response}")
+
 if 'app_input' not in st.session_state:
-    # Add your code here
-    print("app_input not found in data")
+    st.write("app_input not found in session state.")
