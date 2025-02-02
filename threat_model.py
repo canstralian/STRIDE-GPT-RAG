@@ -1,14 +1,11 @@
-#threat_model.py
-
 import json
 import requests
-import google.generativeai as genai
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
-from openai import OpenAI
-from openai import AzureOpenAI
-
+from anthropic import Anthropic
+from mistralai import Mistral, UserMessage
+from openai import OpenAI, AzureOpenAI
 import streamlit as st
+
+import google.generativeai as genai
 
 # Function to convert JSON to Markdown for display.    
 def json_to_markdown(threat_model, improvement_suggestions):
@@ -31,19 +28,22 @@ def json_to_markdown(threat_model, improvement_suggestions):
 # Function to create a prompt for generating a threat model
 def create_threat_model_prompt(app_type, authentication, internet_facing, sensitive_data, app_input):
     prompt = f"""
-Act as a cyber security expert with more than 20 years experience of using the STRIDE threat modelling methodology to produce comprehensive threat models for a wide range of applications. Your task is to use the application description and additional provided to you to produce a list of specific threats for the application.
+Act as a cyber security expert with more than 20 years experience of using the STRIDE threat modelling methodology to produce comprehensive threat models for a wide range of applications. Your task is to analyze the provided code summary, README content, and application description to produce a list of specific threats for the application.
+
+Pay special attention to the README content as it often provides valuable context about the project's purpose, architecture, and potential security considerations.
 
 For each of the STRIDE categories (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, and Elevation of Privilege), list multiple (3 or 4) credible threats if applicable. Each threat scenario should provide a credible scenario in which the threat could occur in the context of the application. It is very important that your responses are tailored to reflect the details you are given.
 
 When providing the threat model, use a JSON formatted response with the keys "threat_model" and "improvement_suggestions". Under "threat_model", include an array of objects with the keys "Threat Type", "Scenario", and "Potential Impact". 
 
-Under "improvement_suggestions", include an array of strings with suggestions on how the threat modeller can improve their application description in order to allow the tool to produce a more comprehensive threat model.
+Under "improvement_suggestions", include an array of strings with suggestions on how the developers can improve their code or application description to enhance security.
 
 APPLICATION TYPE: {app_type}
 AUTHENTICATION METHODS: {authentication}
 INTERNET FACING: {internet_facing}
 SENSITIVE DATA: {sensitive_data}
-APPLICATION DESCRIPTION: {app_input}
+CODE SUMMARY, README CONTENT, AND APPLICATION DESCRIPTION:
+{app_input}
 
 Example of expected JSON response format:
   
@@ -187,7 +187,11 @@ def get_threat_model_google(google_api_key, google_model, prompt):
     model = genai.GenerativeModel(
         google_model,
         generation_config={"response_mime_type": "application/json"})
-    response = model.generate_content(prompt)
+    response = model.generate_content(
+        prompt,
+        safety_settings={
+            'DANGEROUS': 'block_only_high' # Set safety filter to allow generation of threat models
+        })
     try:
         # Access the JSON content from the 'parts' attribute of the 'content' object
         response_content = json.loads(response.candidates[0].content.parts[0].text)
@@ -201,17 +205,56 @@ def get_threat_model_google(google_api_key, google_model, prompt):
 
 # Function to get threat model from the Mistral response.
 def get_threat_model_mistral(mistral_api_key, mistral_model, prompt):
-    client = MistralClient(api_key=mistral_api_key)
+    client = Mistral(api_key=mistral_api_key)
 
-    response = client.chat(
+    response = client.chat.complete(
         model = mistral_model,
         response_format={"type": "json_object"},
         messages=[
-            ChatMessage(role="user", content=prompt)
+            UserMessage(content=prompt)
         ]
     )
 
     # Convert the JSON string in the 'content' field to a Python dictionary
     response_content = json.loads(response.choices[0].message.content)
 
+    return response_content
+
+# Function to get threat model from Ollama hosted LLM.
+def get_threat_model_ollama(ollama_model, prompt):
+
+    url = "http://localhost:11434/api/generate"
+
+    data = {
+        "model": ollama_model,
+        "prompt": prompt,
+        "format": "json",
+        "stream": False
+    }
+
+    response = requests.post(url, json=data)
+
+    outer_json = response.json()
+
+    inner_json = json.loads(outer_json['response'])
+
+    return inner_json
+
+# Function to get threat model from the Claude response.
+def get_threat_model_anthropic(anthropic_api_key, anthropic_model, prompt):
+    client = Anthropic(api_key=anthropic_api_key)
+    response = client.messages.create(
+        model=anthropic_model,
+        max_tokens=1024,
+        system="You are a helpful assistant designed to output JSON.",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    # Combine all text blocks into a single string
+    full_content = ''.join(block.text for block in response.content)
+    
+    # Parse the combined JSON string
+    response_content = json.loads(full_content)
     return response_content

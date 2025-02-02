@@ -1,7 +1,9 @@
+import requests
+from anthropic import Anthropic
+from mistralai import Mistral
+from openai import OpenAI, AzureOpenAI
+
 import google.generativeai as genai
-from mistralai.client import MistralClient
-from openai import OpenAI
-from openai import AzureOpenAI
 
 # Function to create a prompt to generate mitigating controls
 def create_test_cases_prompt(threats):
@@ -82,9 +84,9 @@ def get_test_cases_google(google_api_key, google_model, prompt):
 
 # Function to get test cases from the Mistral model's response.
 def get_test_cases_mistral(mistral_api_key, mistral_model, prompt):
-    client = MistralClient(api_key=mistral_api_key)
+    client = Mistral(api_key=mistral_api_key)
 
-    response = client.chat(
+    response = client.chat.complete(
         model = mistral_model,
         messages=[
             {"role": "system", "content": "You are a helpful assistant that provides Gherkin test cases in Markdown format."},
@@ -94,5 +96,49 @@ def get_test_cases_mistral(mistral_api_key, mistral_model, prompt):
 
     # Access the content directly as the response will be in text format
     test_cases = response.choices[0].message.content
+
+    return test_cases
+
+# Function to get test cases from Ollama hosted LLM.
+def get_test_cases_ollama(ollama_model, prompt):
+    
+    url = "http://localhost:11434/api/chat"
+
+    data = {
+        "model": ollama_model,
+        "stream": False,
+        "messages": [
+            {
+                "role": "system", 
+                "content": "You are a helpful assistant that provides Gherkin test cases in Markdown format."},
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    }
+    response = requests.post(url, json=data)
+
+    outer_json = response.json()
+    
+    # Access the 'content' attribute of the 'message' dictionary
+    mitigations = outer_json["message"]["content"]
+
+    return mitigations
+
+# Function to get test cases from the Anthropic model's response.
+def get_test_cases_anthropic(anthropic_api_key, anthropic_model, prompt):
+    client = Anthropic(api_key=anthropic_api_key)
+    response = client.messages.create(
+        model=anthropic_model,
+        max_tokens=4096,
+        system="You are a helpful assistant that provides Gherkin test cases in Markdown format.",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    # Access the text content from the first content block
+    test_cases = response.content[0].text
 
     return test_cases

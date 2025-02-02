@@ -1,11 +1,12 @@
 import json
-import google.generativeai as genai
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
-from openai import OpenAI
-from openai import AzureOpenAI
-
+import requests
+import time
+from anthropic import Anthropic
+from mistralai import Mistral, UserMessage
+from openai import OpenAI, AzureOpenAI
 import streamlit as st
+
+import google.generativeai as genai
 
 def dread_json_to_markdown(dread_assessment):
     markdown_output = "| Threat Type | Scenario | Damage Potential | Reproducibility | Exploitability | Affected Users | Discoverability | Risk Score |\n"
@@ -130,34 +131,132 @@ def get_dread_assessment_azure(azure_api_endpoint, azure_api_key, azure_api_vers
 # Function to get DREAD risk assessment from the Google model's response.
 def get_dread_assessment_google(google_api_key, google_model, prompt):
     genai.configure(api_key=google_api_key)
-    model = genai.GenerativeModel(
-        google_model,
-        generation_config={"response_mime_type": "application/json"})
-    response = model.generate_content(prompt)
+    
+    model = genai.GenerativeModel(google_model)
+    
+    # Create the system message
+    system_message = "You are a helpful assistant designed to output JSON. Only provide the DREAD risk assessment in JSON format with no additional text. Do not wrap the output in a code block."
+    
+    # Start a chat session with the system message in the history
+    chat = model.start_chat(history=[
+        {"role": "user", "parts": [system_message]},
+        {"role": "model", "parts": ["Understood. I will provide DREAD risk assessments in JSON format only and will not wrap the output in a code block."]}
+    ])
+    
+    # Send the actual prompt
+    response = chat.send_message(
+        prompt, 
+        safety_settings={
+            'DANGEROUS': 'block_only_high' # Set safety filter to allow generation of DREAD risk assessments
+        })
+    print(response)
+    
     try:
-        # Access the JSON content from the 'parts' attribute of the 'content' object
-        response_content = json.loads(response.candidates[0].content.parts[0].text)
+        # Access the JSON content from the response
+        dread_assessment = json.loads(response.text)
+        return dread_assessment
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON: {str(e)}")
         print("Raw JSON string:")
-        print(response.candidates[0].content.parts[0].text)
-        return None
-
-    return response_content
+        print(response.text)
+        return {}
 
 # Function to get DREAD risk assessment from the Mistral model's response.
 def get_dread_assessment_mistral(mistral_api_key, mistral_model, prompt):
-    client = MistralClient(api_key=mistral_api_key)
+    client = Mistral(api_key=mistral_api_key)
 
-    response = client.chat(
-        model = mistral_model,
+    response = client.chat.complete(
+        model=mistral_model,
         response_format={"type": "json_object"},
         messages=[
-            ChatMessage(role="user", content=prompt)
+            UserMessage(content=prompt)
         ]
     )
 
-    # Convert the JSON string in the 'content' field to a Python dictionary
-    response_content = json.loads(response.choices[0].message.content)
+    try:
+        # Convert the JSON string in the 'content' field to a Python dictionary
+        dread_assessment = json.loads(response.choices[0].message.content)
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON: {str(e)}")
+        print("Raw JSON string:")
+        print(response.choices[0].message.content)
+        dread_assessment = {}
 
-    return response_content
+    return dread_assessment
+
+# Function to get DREAD risk assessment from Ollama hosted LLM.
+def get_dread_assessment_ollama(ollama_model, prompt):
+    url = "http://localhost:11434/api/chat"
+    max_retries = 3
+    retry_delay = 2  # seconds
+
+    for attempt in range(1, max_retries + 1):
+        data = {
+            "model": ollama_model,
+            "stream": False,
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "You are a helpful assistant designed to output JSON. Only provide the DREAD risk assessment in JSON format with no additional text."
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "format": "json"
+                }
+            ]
+        }
+        
+        try:
+            response = requests.post(url, json=data)
+            outer_json = response.json()
+            response_content = outer_json["message"]["content"]
+
+            # Attempt to parse JSON
+            dread_assessment = json.loads(response_content)
+            return dread_assessment
+
+        except json.JSONDecodeError as e:
+            st.error(f"Attempt {attempt}: Error decoding JSON. Retrying...")
+            print(f"Error decoding JSON: {str(e)}")
+            print("Raw JSON string:")
+            print(response_content)
+            
+            if attempt < max_retries:
+                time.sleep(retry_delay)
+            else:
+                st.error("Max retries reached. Unable to generate valid JSON response.")
+                return {}
+
+    # This line should never be reached due to the return statements above,
+    # but it's here as a fallback
+    return {}
+
+# Function to get DREAD risk assessment from the Anthropic model's response.
+def get_dread_assessment_anthropic(anthropic_api_key, anthropic_model, prompt):
+    client = Anthropic(api_key=anthropic_api_key)
+    response = client.messages.create(
+        model=anthropic_model,
+        max_tokens=4096,
+        system="You are a helpful assistant designed to output JSON.",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+    
+    try:
+        # Extract the text content from the first content block
+        response_text = response.content[0].text
+        
+        # Check if the JSON is complete (should end with a closing brace)
+        if not response_text.strip().endswith('}'):
+            raise json.JSONDecodeError("Incomplete JSON response", response_text, len(response_text))
+            
+        # Parse the JSON string
+        dread_assessment = json.loads(response_text)
+        return dread_assessment
+    except (json.JSONDecodeError, IndexError, AttributeError) as e:
+        print(f"Error processing response: {str(e)}")
+        print("Raw response:")
+        print(response)
+        return {}

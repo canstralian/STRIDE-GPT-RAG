@@ -1,7 +1,9 @@
 import re
-from mistralai.client import MistralClient
-from openai import OpenAI
-from openai import AzureOpenAI
+import requests
+import streamlit as st
+from anthropic import Anthropic
+from mistralai import Mistral
+from openai import OpenAI, AzureOpenAI
 
 # Function to create a prompt to generate an attack tree
 def create_attack_tree_prompt(app_type, authentication, internet_facing, sensitive_data, app_input):
@@ -95,9 +97,9 @@ IMPORTANT: Round brackets are special characters in Mermaid syntax. If you want 
 
 # Function to get attack tree from the Mistral model's response.
 def get_attack_tree_mistral(mistral_api_key, mistral_model, prompt):
-    client = MistralClient(api_key=mistral_api_key)
+    client = Mistral(api_key=mistral_api_key)
 
-    response = client.chat(
+    response = client.chat.complete(
         model=mistral_model,
         messages=[
             {"role": "system", "content": """
@@ -125,6 +127,88 @@ IMPORTANT: Round brackets are special characters in Mermaid syntax. If you want 
     # Access the 'content' attribute of the 'message' object directly
     attack_tree_code = response.choices[0].message.content
     
+    # Remove Markdown code block delimiters using regular expression
+    attack_tree_code = re.sub(r'^```mermaid\s*|\s*```$', '', attack_tree_code, flags=re.MULTILINE)
+
+    return attack_tree_code
+
+# Function to get attack tree from Ollama hosted LLM.
+def get_attack_tree_ollama(ollama_model, prompt):
+    
+    url = "http://localhost:11434/api/chat"
+
+    data = {
+        "model": ollama_model,
+        "stream": False,
+        "messages": [
+            {
+                "role": "system", 
+                "content": """
+Act as a cyber security expert with more than 20 years experience of using the STRIDE threat modelling methodology to produce comprehensive threat models for a wide range of applications. Your task is to use the application description provided to you to produce an attack tree in Mermaid syntax. The attack tree should reflect the potential threats for the application based on the details given.
+
+You MUST only respond with the Mermaid code block. See below for a simple example of the required format and syntax for your output.
+
+```mermaid
+graph TD
+    A[Enter Chart Definition] --> B(Preview)
+    B --> C{{decide}}
+    C --> D["Keep"]
+    C --> E["Edit Definition (Edit)"]
+    E --> B
+    D --> F["Save Image and Code"]
+    F --> B
+```
+
+IMPORTANT: Round brackets are special characters in Mermaid syntax. If you want to use round brackets inside a node label you MUST wrap the label in double quotes. For example, ["Example Node Label (ENL)"].
+"""},
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    }
+    response = requests.post(url, json=data)
+
+    outer_json = response.json()
+    
+    # Access the 'content' attribute of the 'message' dictionary
+    attack_tree_code = outer_json["message"]["content"]
+
+    # Remove Markdown code block delimiters using regular expression
+    attack_tree_code = re.sub(r'^```mermaid\s*|\s*```$', '', attack_tree_code, flags=re.MULTILINE)
+
+    return attack_tree_code
+
+# Function to get attack tree from Anthropic's Claude model.
+def get_attack_tree_anthropic(anthropic_api_key, anthropic_model, prompt):
+    client = Anthropic(api_key=anthropic_api_key)
+
+    response = client.messages.create(
+        model=anthropic_model,
+        max_tokens=1024,
+        system="""
+Act as a cyber security expert with more than 20 years experience of using the STRIDE threat modelling methodology to produce comprehensive threat models for a wide range of applications. Your task is to use the application description provided to you to produce an attack tree in Mermaid syntax. The attack tree should reflect the potential threats for the application based on the details given.
+You MUST only respond with the Mermaid code block. See below for a simple example of the required format and syntax for your output.
+```mermaid
+graph TD
+    A[Enter Chart Definition] --> B(Preview)
+    B --> C{{decide}}
+    C --> D["Keep"]
+    C --> E["Edit Definition (Edit)"]
+    E --> B
+    D --> F["Save Image and Code"]
+    F --> B
+```
+IMPORTANT: Round brackets are special characters in Mermaid syntax. If you want to use round brackets inside a node label you MUST wrap the label in double quotes. For example, ["Example Node Label (ENL)"].
+""",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    # Access the 'content' attribute of the 'message' object directly
+    attack_tree_code = response.content[0].text
+
     # Remove Markdown code block delimiters using regular expression
     attack_tree_code = re.sub(r'^```mermaid\s*|\s*```$', '', attack_tree_code, flags=re.MULTILINE)
 
