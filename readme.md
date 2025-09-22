@@ -90,6 +90,8 @@ For more accurate, context-aware threat modeling:
 
 For detailed information about RAG implementation, see [RAG_IMPLEMENTATION.md](RAG_IMPLEMENTATION.md).
 
+For examples of RAG-enhanced threat analysis, see [RAG_EXAMPLES.md](RAG_EXAMPLES.md).
+
 ## Requirements
 
 - **Python Version:** 3.8 or higher.
