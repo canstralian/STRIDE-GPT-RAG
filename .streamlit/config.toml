@@ -1,6 +1,6 @@
 [theme]
-primaryColor="#1cb3e0"
-backgroundColor="#222f3b"
-secondaryBackgroundColor="#344758"
-textColor="#d2d2d6"
-font="sans serif"
+primaryColor="#c471ed"          # neon-magenta purple accent
+backgroundColor="#0a0a0f"       # pitch black with a hint of blue undertone
+secondaryBackgroundColor="#1a0b2e" # deep violet-black for panels/cards
+textColor="#e0d7ff"             # glowing lavender-white text
+font="monospace"                # console/code feel
