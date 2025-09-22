@@ -1,10 +1,16 @@
 import os
+import streamlit as st
 from dotenv import load_dotenv
 
-def load_env_variables():
+def load_env():
+    """Load environment variables from .env file if it exists"""
     if os.path.exists('.env'):
         load_dotenv('.env')
 
+def load_env_variables():
+    """Load environment variables into Streamlit session state"""
+    load_env()
+    
     github_api_key = os.getenv('GITHUB_API_KEY')
     if github_api_key:
         st.session_state['github_api_key'] = github_api_key

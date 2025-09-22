@@ -2,6 +2,7 @@ import base64
 import re
 from collections import defaultdict
 from github import Github
+import streamlit as st
 
 def analyze_github_repo(repo_url):
     try:
