@@ -1,4 +1,4 @@
-name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+name: Deploy Jekyll to GitHub Pages & Hugging Face Spaces
 
 on:
   push:
@@ -41,7 +41,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
-  deploy:
+  deploy-ghpages:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -51,3 +51,36 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-huggingface:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: huggingface-cli login --token $HF_TOKEN
+
+      - name: Push site to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: |
+          # Replace with your username and space name
+          SPACE_REPO="https://huggingface.co/spaces/YOUR_USERNAME/my-jekyll-site"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add space "https://user:$HF_TOKEN@huggingface.co/spaces/YOUR_USERNAME/my-jekyll-site"
+          
+          # Push the built site (_site folder) to Hugging Face
+          rm -rf .git
+          mv _site site
+          cd site
+          git init
+          git add .
+          git commit -m "Deploy from GitHub Actions"
+          git branch -M main
+          git remote add origin "https://user:$HF_TOKEN@huggingface.co/spaces/YOUR_USERNAME/my-jekyll-site"
+          git push -u origin main --force
