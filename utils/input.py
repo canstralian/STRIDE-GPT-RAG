@@ -1,4 +1,5 @@
 import streamlit as st
+from .repo_analysis import analyze_github_repo
 
 def get_input():
     github_url = st.text_input(

@@ -20,8 +20,12 @@ license: apache-2.0
 ## Features
 
 - **STRIDE Framework Integration:** Utilizes the STRIDE methodology to systematically identify threats.
-- **Retrieval-Augmented Generation:** Enhances threat analysis by retrieving relevant information from a comprehensive knowledge base.
+- **Retrieval-Augmented Generation (RAG):** Enhances threat analysis by retrieving and analyzing GitHub repository content for context-aware threat modeling.
+- **Repository Analysis:** Automatically extracts README content, code structure, dependencies, and architectural information from GitHub repositories.
+- **Context-Aware AI:** Feeds repository context to AI models for more accurate and specific threat identification.
 - **Interactive Interface:** Offers a user-friendly Streamlit interface for seamless interaction.
+- **Multiple AI Providers:** Supports OpenAI, Azure OpenAI, Google Gemini, Anthropic Claude, Mistral, and Ollama.
+- **Comprehensive Output:** Generates threat models, mitigations, attack trees, test cases, and DREAD assessments.
 
 ## Installation
 
@@ -57,14 +61,43 @@ To run the application locally:
 
 ## Usage
 
-1. **Input Threat Scenario:** Enter a description of the potential threat in the provided text box.
-2. **Analyze:** Click the "Analyze" button to generate a detailed STRIDE threat analysis.
-3. **Review Results:** Examine the categorized threats and recommended mitigations.
+### Basic Threat Modeling
+
+1. **Configure AI Provider:** Select your preferred AI model (OpenAI, Google, Anthropic, etc.) and enter API credentials in the sidebar.
+2. **Input Application Details:** Provide application type, authentication methods, and other relevant details in the sidebar.
+3. **Describe Your Application:** Enter a description of the application in the main text area.
+4. **Generate Analysis:** Click "Generate Threat Model" to create a comprehensive STRIDE-based threat analysis.
+
+### RAG-Enhanced Analysis
+
+For more accurate, context-aware threat modeling:
+
+1. **GitHub Integration:** Enter your GitHub API key in the RAG Configuration section.
+2. **Repository Analysis:** Provide a GitHub repository URL in the "Enter GitHub repository URL" field.
+3. **Automatic Context Extraction:** The system will automatically:
+   - Extract README documentation
+   - Analyze code structure and dependencies
+   - Identify technology stack and architecture
+   - Create contextual summaries for enhanced AI analysis
+4. **Enhanced Threat Modeling:** The AI will generate threats specific to your actual codebase and architecture.
+
+### Advanced Features
+
+- **Mitigations:** Generate specific mitigation strategies for identified threats
+- **Attack Trees:** Create visual attack scenarios using Mermaid diagrams
+- **Test Cases:** Generate Gherkin-formatted security test cases
+- **DREAD Assessment:** Perform quantitative risk assessment using the DREAD methodology
+
+For detailed information about RAG implementation, see [RAG_IMPLEMENTATION.md](RAG_IMPLEMENTATION.md).
+
+For examples of RAG-enhanced threat analysis, see [RAG_EXAMPLES.md](RAG_EXAMPLES.md).
 
 ## Requirements
 
 - **Python Version:** 3.8 or higher.
 - **Dependencies:** Listed in `requirements.txt`.
+- **AI Provider API Key:** At least one API key from supported providers (OpenAI, Google, Anthropic, etc.).
+- **GitHub API Key (Optional):** For RAG-enhanced repository analysis - provides more accurate threat modeling.
 
 ## Contributing
 
