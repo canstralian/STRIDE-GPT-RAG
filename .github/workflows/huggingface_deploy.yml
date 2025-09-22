@@ -13,7 +13,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
       with:
-        ref: ${{ github.sha }}  # Pin to specific commit
+        ref: ${{ github.sha }}
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -34,11 +34,17 @@ jobs:
         pip install -r requirements.txt
 
     - name: Authenticate with Huggingface
-      run: huggingface-cli login --token ${{ secrets.HUGGINGFACE_TOKEN }}
+      env:
+        HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+      run: huggingface-cli login --token $HF_TOKEN
 
-    - name: Deploy to Huggingface
+    - name: Push code to Huggingface Space
+      env:
+        HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
       run: |
-        huggingface-cli repo create my-streamlit-app --type=space --private
-        huggingface-cli repo upload --repo-id Canstralian/my-streamlit-app app.py requirements.txt
-        huggingface-cli space hardware --repo-id Canstralian/my-streamlit-app --hardware cpu-basic
-      continue-on-error: true  # Allow workflow to continue even if deployment fails
+        # Replace with your username and space name
+        SPACE_REPO="https://huggingface.co/spaces/YOUR_USERNAME/my-streamlit-app"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git remote add space "https://user:$HF_TOKEN@huggingface.co/spaces/YOUR_USERNAME/my-streamlit-app"
+        git push space main --force
