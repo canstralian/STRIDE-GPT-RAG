@@ -2,7 +2,7 @@ anthropic
 google.generativeai
 mistralai>=1.0.0
 openai
-streamlit>=1.40
+streamlit>=1.64.0
 pyGithub
 python-dotenv
 
