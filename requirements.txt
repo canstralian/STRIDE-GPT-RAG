@@ -1,6 +1,6 @@
 anthropic
 google.generativeai
-mistralai>=1.0.0
+mistralai>=3.3.0
 openai
 streamlit>=1.40
 pyGithub
